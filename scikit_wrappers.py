@@ -18,6 +18,7 @@
 
 import math
 import numpy
+import joblib
 import torch
 import sklearn
 import sklearn.svm
@@ -125,7 +126,7 @@ class TimeSeriesEncoderClassifier(
                '$(prefix_file)_$(architecture)_encoder.pth').
         """
         self.save_encoder(prefix_file)
-        sklearn.externals.joblib.dump(
+        joblib.dump(
             self.classifier, prefix_file + "_" + self.architecture + "_classifier.pkl"
         )
 
@@ -184,7 +185,7 @@ class TimeSeriesEncoderClassifier(
         self.classifier = sklearn.svm.SVC(
             C=1 / self.penalty
             if self.penalty is not None and self.penalty > 0
-            else numpy.inf,
+            else 1e99,
             gamma="scale",
         )
         if train_size // nb_classes < 5 or train_size < 50 or self.penalty is not None:
@@ -193,7 +194,7 @@ class TimeSeriesEncoderClassifier(
             grid_search = sklearn.model_selection.GridSearchCV(
                 self.classifier,
                 {
-                    "C": [0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, numpy.inf],
+                    "C": [0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, 1e99],
                     "kernel": ["rbf"],
                     "degree": [3],
                     "gamma": ["scale"],
@@ -209,7 +210,6 @@ class TimeSeriesEncoderClassifier(
                     "random_state": [None],
                 },
                 cv=5,
-                iid=False,
                 n_jobs=5,
             )
             if train_size <= 10000:
