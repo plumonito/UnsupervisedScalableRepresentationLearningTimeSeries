@@ -48,6 +48,7 @@ class TripletLoss(torch.nn.modules.loss._Loss):
     @param negative_penalty Multiplicative coefficient for the negative sample
            loss.
     """
+
     def __init__(self, compared_length, nb_random_samples, negative_penalty):
         super(TripletLoss, self).__init__()
         self.compared_length = compared_length
@@ -93,30 +94,46 @@ class TripletLoss(torch.nn.modules.loss._Loss):
         # We randomly choose nb_random_samples potential negative samples for
         # each batch example
         beginning_samples_neg = numpy.random.randint(
-            0, high=length - length_pos_neg + 1,
-            size=(self.nb_random_samples, batch_size)
+            0,
+            high=length - length_pos_neg + 1,
+            size=(self.nb_random_samples, batch_size),
         )
 
-        representation = encoder(torch.cat(
-            [batch[
-                j: j + 1, :,
-                beginning_batches[j]: beginning_batches[j] + random_length
-            ] for j in range(batch_size)]
-        ))  # Anchors representations
+        representation = encoder(
+            torch.cat(
+                [
+                    batch[
+                        j : j + 1,
+                        :,
+                        beginning_batches[j] : beginning_batches[j] + random_length,
+                    ]
+                    for j in range(batch_size)
+                ]
+            )
+        )  # Anchors representations
 
-        positive_representation = encoder(torch.cat(
-            [batch[
-                j: j + 1, :, end_positive[j] - length_pos_neg: end_positive[j]
-            ] for j in range(batch_size)]
-        ))  # Positive samples representations
+        positive_representation = encoder(
+            torch.cat(
+                [
+                    batch[
+                        j : j + 1, :, end_positive[j] - length_pos_neg : end_positive[j]
+                    ]
+                    for j in range(batch_size)
+                ]
+            )
+        )  # Positive samples representations
 
         size_representation = representation.size(1)
         # Positive loss: -logsigmoid of dot product between anchor and positive
         # representations
-        loss = -torch.mean(torch.nn.functional.logsigmoid(torch.bmm(
-            representation.view(batch_size, 1, size_representation),
-            positive_representation.view(batch_size, size_representation, 1)
-        )))
+        loss = -torch.mean(
+            torch.nn.functional.logsigmoid(
+                torch.bmm(
+                    representation.view(batch_size, 1, size_representation),
+                    positive_representation.view(batch_size, size_representation, 1),
+                )
+            )
+        )
 
         # If required, backward through the first computed term of the loss and
         # free from the graph everything related to the positive sample
@@ -131,19 +148,27 @@ class TripletLoss(torch.nn.modules.loss._Loss):
             # Negative loss: -logsigmoid of minus the dot product between
             # anchor and negative representations
             negative_representation = encoder(
-                torch.cat([train[samples[i, j]: samples[i, j] + 1][
-                    :, :,
-                    beginning_samples_neg[i, j]:
-                    beginning_samples_neg[i, j] + length_pos_neg
-                ] for j in range(batch_size)])
+                torch.cat(
+                    [
+                        train[samples[i, j] : samples[i, j] + 1][
+                            :,
+                            :,
+                            beginning_samples_neg[i, j] : beginning_samples_neg[i, j]
+                            + length_pos_neg,
+                        ]
+                        for j in range(batch_size)
+                    ]
+                )
             )
             loss += multiplicative_ratio * -torch.mean(
-                torch.nn.functional.logsigmoid(-torch.bmm(
-                    representation.view(batch_size, 1, size_representation),
-                    negative_representation.view(
-                        batch_size, size_representation, 1
+                torch.nn.functional.logsigmoid(
+                    -torch.bmm(
+                        representation.view(batch_size, 1, size_representation),
+                        negative_representation.view(
+                            batch_size, size_representation, 1
+                        ),
                     )
-                ))
+                )
             )
             # If required, backward through the first computed term of the loss
             # and free from the graph everything related to the negative sample
@@ -186,6 +211,7 @@ class TripletLossVaryingLength(torch.nn.modules.loss._Loss):
     @param negative_penalty Multiplicative coefficient for the negative sample
            loss.
     """
+
     def __init__(self, compared_length, nb_random_samples, negative_penalty):
         super(TripletLossVaryingLength, self).__init__()
         self.compared_length = compared_length
@@ -209,47 +235,55 @@ class TripletLossVaryingLength(torch.nn.modules.loss._Loss):
 
         # Computation of the lengths of the relevant time series
         with torch.no_grad():
-            lengths_batch = max_length - torch.sum(
-                torch.isnan(batch[:, 0]), 1
-            ).data.cpu().numpy()
+            lengths_batch = (
+                max_length - torch.sum(torch.isnan(batch[:, 0]), 1).data.cpu().numpy()
+            )
             lengths_samples = numpy.empty(
                 (self.nb_random_samples, batch_size), dtype=int
             )
             for i in range(self.nb_random_samples):
-                lengths_samples[i] = max_length - torch.sum(
-                    torch.isnan(train[samples[i], 0]), 1
-                ).data.cpu().numpy()
+                lengths_samples[i] = (
+                    max_length
+                    - torch.sum(torch.isnan(train[samples[i], 0]), 1).data.cpu().numpy()
+                )
 
         # Choice of lengths of positive and negative samples
         lengths_pos = numpy.empty(batch_size, dtype=int)
-        lengths_neg = numpy.empty(
-            (self.nb_random_samples, batch_size), dtype=int
-        )
+        lengths_neg = numpy.empty((self.nb_random_samples, batch_size), dtype=int)
         for j in range(batch_size):
             lengths_pos[j] = numpy.random.randint(
                 1, high=min(self.compared_length, lengths_batch[j]) + 1
             )
             for i in range(self.nb_random_samples):
                 lengths_neg[i, j] = numpy.random.randint(
-                    1,
-                    high=min(self.compared_length, lengths_samples[i, j]) + 1
+                    1, high=min(self.compared_length, lengths_samples[i, j]) + 1
                 )
 
         # We choose for each batch example a random interval in the time
         # series, which is the 'anchor'
-        random_length = numpy.array([numpy.random.randint(
-            lengths_pos[j],
-            high=min(self.compared_length, lengths_batch[j]) + 1
-        ) for j in range(batch_size)])  # Length of anchors
-        beginning_batches = numpy.array([numpy.random.randint(
-            0, high=lengths_batch[j] - random_length[j] + 1
-        ) for j in range(batch_size)])  # Start of anchors
+        random_length = numpy.array(
+            [
+                numpy.random.randint(
+                    lengths_pos[j], high=min(self.compared_length, lengths_batch[j]) + 1
+                )
+                for j in range(batch_size)
+            ]
+        )  # Length of anchors
+        beginning_batches = numpy.array(
+            [
+                numpy.random.randint(0, high=lengths_batch[j] - random_length[j] + 1)
+                for j in range(batch_size)
+            ]
+        )  # Start of anchors
 
         # The positive samples are chosen at random in the chosen anchors
         # Start of positive samples in the anchors
-        beginning_samples_pos = numpy.array([numpy.random.randint(
-            0, high=random_length[j] - lengths_pos[j] + 1
-        ) for j in range(batch_size)])
+        beginning_samples_pos = numpy.array(
+            [
+                numpy.random.randint(0, high=random_length[j] - lengths_pos[j] + 1)
+                for j in range(batch_size)
+            ]
+        )
         # Start of positive samples in the batch examples
         beginning_positive = beginning_batches + beginning_samples_pos
         # End of positive samples in the batch examples
@@ -257,31 +291,53 @@ class TripletLossVaryingLength(torch.nn.modules.loss._Loss):
 
         # We randomly choose nb_random_samples potential negative samples for
         # each batch example
-        beginning_samples_neg = numpy.array([[numpy.random.randint(
-            0, high=lengths_samples[i, j] - lengths_neg[i, j] + 1
-        ) for j in range(batch_size)] for i in range(self.nb_random_samples)])
-
-        representation = torch.cat([encoder(
-            batch[
-                j: j + 1, :,
-                beginning_batches[j]: beginning_batches[j] + random_length[j]
+        beginning_samples_neg = numpy.array(
+            [
+                [
+                    numpy.random.randint(
+                        0, high=lengths_samples[i, j] - lengths_neg[i, j] + 1
+                    )
+                    for j in range(batch_size)
+                ]
+                for i in range(self.nb_random_samples)
             ]
-        ) for j in range(batch_size)])  # Anchors representations
+        )
 
-        positive_representation = torch.cat([encoder(
-            batch[
-                j: j + 1, :,
-                end_positive[j] - lengths_pos[j]: end_positive[j]
+        representation = torch.cat(
+            [
+                encoder(
+                    batch[
+                        j : j + 1,
+                        :,
+                        beginning_batches[j] : beginning_batches[j] + random_length[j],
+                    ]
+                )
+                for j in range(batch_size)
             ]
-        ) for j in range(batch_size)])  # Positive samples representations
+        )  # Anchors representations
+
+        positive_representation = torch.cat(
+            [
+                encoder(
+                    batch[
+                        j : j + 1, :, end_positive[j] - lengths_pos[j] : end_positive[j]
+                    ]
+                )
+                for j in range(batch_size)
+            ]
+        )  # Positive samples representations
 
         size_representation = representation.size(1)
         # Positive loss: -logsigmoid of dot product between anchor and positive
         # representations
-        loss = -torch.mean(torch.nn.functional.logsigmoid(torch.bmm(
-            representation.view(batch_size, 1, size_representation),
-            positive_representation.view(batch_size, size_representation, 1)
-        )))
+        loss = -torch.mean(
+            torch.nn.functional.logsigmoid(
+                torch.bmm(
+                    representation.view(batch_size, 1, size_representation),
+                    positive_representation.view(batch_size, size_representation, 1),
+                )
+            )
+        )
 
         # If required, backward through the first computed term of the loss and
         # free from the graph everything related to the positive sample
@@ -295,20 +351,28 @@ class TripletLossVaryingLength(torch.nn.modules.loss._Loss):
         for i in range(self.nb_random_samples):
             # Negative loss: -logsigmoid of minus the dot product between
             # anchor and negative representations
-            negative_representation = torch.cat([encoder(
-                train[samples[i, j]: samples[i, j] + 1][
-                    :, :,
-                    beginning_samples_neg[i, j]:
-                    beginning_samples_neg[i, j] + lengths_neg[i, j]
-                ]
-            ) for j in range(batch_size)])
-            loss += multiplicative_ratio * -torch.mean(
-                torch.nn.functional.logsigmoid(-torch.bmm(
-                    representation.view(batch_size, 1, size_representation),
-                    negative_representation.view(
-                        batch_size, size_representation, 1
+            negative_representation = torch.cat(
+                [
+                    encoder(
+                        train[samples[i, j] : samples[i, j] + 1][
+                            :,
+                            :,
+                            beginning_samples_neg[i, j] : beginning_samples_neg[i, j]
+                            + lengths_neg[i, j],
+                        ]
                     )
-                ))
+                    for j in range(batch_size)
+                ]
+            )
+            loss += multiplicative_ratio * -torch.mean(
+                torch.nn.functional.logsigmoid(
+                    -torch.bmm(
+                        representation.view(batch_size, 1, size_representation),
+                        negative_representation.view(
+                            batch_size, size_representation, 1
+                        ),
+                    )
+                )
             )
             # If required, backward through the first computed term of the loss
             # and free from the graph everything related to the negative sample

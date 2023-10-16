@@ -26,6 +26,7 @@ class Dataset(torch.utils.data.Dataset):
 
     @param dataset Numpy array representing the dataset.
     """
+
     def __init__(self, dataset):
         self.dataset = dataset
 
@@ -44,6 +45,7 @@ class LabelledDataset(torch.utils.data.Dataset):
     @param labels One-dimensional array of the same length as dataset with
            non-negative int values.
     """
+
     def __init__(self, dataset, labels):
         self.dataset = dataset
         self.labels = labels

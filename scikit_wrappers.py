@@ -29,8 +29,9 @@ import losses
 import networks
 
 
-class TimeSeriesEncoderClassifier(sklearn.base.BaseEstimator,
-                                  sklearn.base.ClassifierMixin):
+class TimeSeriesEncoderClassifier(
+    sklearn.base.BaseEstimator, sklearn.base.ClassifierMixin
+):
     """
     "Virtual" class to wrap an encoder of time series as a PyTorch module and
     a SVM classifier with RBF kernel on top of its computed representations in
@@ -64,11 +65,25 @@ class TimeSeriesEncoderClassifier(sklearn.base.BaseEstimator,
     @param cuda Transfers, if True, all computations to the GPU.
     @param gpu GPU index to use, if CUDA is enabled.
     """
-    def __init__(self, compared_length, nb_random_samples, negative_penalty,
-                 batch_size, nb_steps, lr, penalty, early_stopping,
-                 encoder, params, in_channels, out_channels, cuda=False,
-                 gpu=0):
-        self.architecture = ''
+
+    def __init__(
+        self,
+        compared_length,
+        nb_random_samples,
+        negative_penalty,
+        batch_size,
+        nb_steps,
+        lr,
+        penalty,
+        early_stopping,
+        encoder,
+        params,
+        in_channels,
+        out_channels,
+        cuda=False,
+        gpu=0,
+    ):
+        self.architecture = ""
         self.cuda = cuda
         self.gpu = gpu
         self.batch_size = batch_size
@@ -98,7 +113,7 @@ class TimeSeriesEncoderClassifier(sklearn.base.BaseEstimator,
         """
         torch.save(
             self.encoder.state_dict(),
-            prefix_file + '_' + self.architecture + '_encoder.pth'
+            prefix_file + "_" + self.architecture + "_encoder.pth",
         )
 
     def save(self, prefix_file):
@@ -111,8 +126,7 @@ class TimeSeriesEncoderClassifier(sklearn.base.BaseEstimator,
         """
         self.save_encoder(prefix_file)
         sklearn.externals.joblib.dump(
-            self.classifier,
-            prefix_file + '_' + self.architecture + '_classifier.pkl'
+            self.classifier, prefix_file + "_" + self.architecture + "_classifier.pkl"
         )
 
     def load_encoder(self, prefix_file):
@@ -123,15 +137,19 @@ class TimeSeriesEncoderClassifier(sklearn.base.BaseEstimator,
                be loaded (at '$(prefix_file)_$(architecture)_encoder.pth').
         """
         if self.cuda:
-            self.encoder.load_state_dict(torch.load(
-                prefix_file + '_' + self.architecture + '_encoder.pth',
-                map_location=lambda storage, loc: storage.cuda(self.gpu)
-            ))
+            self.encoder.load_state_dict(
+                torch.load(
+                    prefix_file + "_" + self.architecture + "_encoder.pth",
+                    map_location=lambda storage, loc: storage.cuda(self.gpu),
+                )
+            )
         else:
-            self.encoder.load_state_dict(torch.load(
-                prefix_file + '_' + self.architecture + '_encoder.pth',
-                map_location=lambda storage, loc: storage
-            ))
+            self.encoder.load_state_dict(
+                torch.load(
+                    prefix_file + "_" + self.architecture + "_encoder.pth",
+                    map_location=lambda storage, loc: storage,
+                )
+            )
 
     def load(self, prefix_file):
         """
@@ -143,7 +161,7 @@ class TimeSeriesEncoderClassifier(sklearn.base.BaseEstimator,
         """
         self.load_encoder(prefix_file)
         self.classifier = sklearn.externals.joblib.load(
-            prefix_file + '_' + self.architecture + '_classifier.pkl'
+            prefix_file + "_" + self.architecture + "_classifier.pkl"
         )
 
     def fit_classifier(self, features, y):
@@ -167,32 +185,32 @@ class TimeSeriesEncoderClassifier(sklearn.base.BaseEstimator,
             C=1 / self.penalty
             if self.penalty is not None and self.penalty > 0
             else numpy.inf,
-            gamma='scale'
+            gamma="scale",
         )
         if train_size // nb_classes < 5 or train_size < 50 or self.penalty is not None:
             return self.classifier.fit(features, y)
         else:
             grid_search = sklearn.model_selection.GridSearchCV(
-                self.classifier, {
-                    'C': [
-                        0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000,
-                        numpy.inf
-                    ],
-                    'kernel': ['rbf'],
-                    'degree': [3],
-                    'gamma': ['scale'],
-                    'coef0': [0],
-                    'shrinking': [True],
-                    'probability': [False],
-                    'tol': [0.001],
-                    'cache_size': [200],
-                    'class_weight': [None],
-                    'verbose': [False],
-                    'max_iter': [10000000],
-                    'decision_function_shape': ['ovr'],
-                    'random_state': [None]
+                self.classifier,
+                {
+                    "C": [0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, numpy.inf],
+                    "kernel": ["rbf"],
+                    "degree": [3],
+                    "gamma": ["scale"],
+                    "coef0": [0],
+                    "shrinking": [True],
+                    "probability": [False],
+                    "tol": [0.001],
+                    "cache_size": [200],
+                    "class_weight": [None],
+                    "verbose": [False],
+                    "max_iter": [10000000],
+                    "decision_function_shape": ["ovr"],
+                    "random_state": [None],
                 },
-                cv=5, iid=False, n_jobs=5
+                cv=5,
+                iid=False,
+                n_jobs=5,
             )
             if train_size <= 10000:
                 grid_search.fit(features, y)
@@ -200,8 +218,7 @@ class TimeSeriesEncoderClassifier(sklearn.base.BaseEstimator,
                 # If the training set is too large, subsample 10000 train
                 # examples
                 split = sklearn.model_selection.train_test_split(
-                    features, y,
-                    train_size=10000, random_state=0, stratify=y
+                    features, y, train_size=10000, random_state=0, stratify=y
                 )
                 grid_search.fit(split[0], split[2])
             self.classifier = grid_search.best_estimator_
@@ -248,7 +265,7 @@ class TimeSeriesEncoderClassifier(sklearn.base.BaseEstimator,
         # Encoder training
         while i < self.nb_steps:
             if verbose:
-                print('Epoch: ', epochs + 1)
+                print("Epoch: ", epochs + 1)
             for batch in train_generator:
                 if self.cuda:
                     batch = batch.cuda(self.gpu)
@@ -268,16 +285,20 @@ class TimeSeriesEncoderClassifier(sklearn.base.BaseEstimator,
                     break
             epochs += 1
             # Early stopping strategy
-            if self.early_stopping is not None and y is not None and (
-                ratio >= 5 and train_size >= 50
+            if (
+                self.early_stopping is not None
+                and y is not None
+                and (ratio >= 5 and train_size >= 50)
             ):
                 # Computes the best regularization parameters
                 features = self.encode(X)
                 self.classifier = self.fit_classifier(features, y)
                 # Cross validation score
-                score = numpy.mean(sklearn.model_selection.cross_val_score(
-                    self.classifier, features, y=y, cv=5, n_jobs=5
-                ))
+                score = numpy.mean(
+                    sklearn.model_selection.cross_val_score(
+                        self.classifier, features, y=y, cv=5, n_jobs=5
+                    )
+                )
                 count += 1
                 # If the model is better than the previous one, update
                 if score > max_score:
@@ -348,17 +369,18 @@ class TimeSeriesEncoderClassifier(sklearn.base.BaseEstimator,
                     if self.cuda:
                         batch = batch.cuda(self.gpu)
                     features[
-                        count * batch_size: (count + 1) * batch_size
+                        count * batch_size : (count + 1) * batch_size
                     ] = self.encoder(batch).cpu()
                     count += 1
             else:
                 for batch in test_generator:
                     if self.cuda:
                         batch = batch.cuda(self.gpu)
-                    length = batch.size(2) - torch.sum(
-                        torch.isnan(batch[0, 0])
-                    ).data.cpu().numpy()
-                    features[count: count + 1] = self.encoder(
+                    length = (
+                        batch.size(2)
+                        - torch.sum(torch.isnan(batch[0, 0])).data.cpu().numpy()
+                    )
+                    features[count : count + 1] = self.encoder(
                         batch[:, :, :length]
                     ).cpu()
                     count += 1
@@ -379,31 +401,30 @@ class TimeSeriesEncoderClassifier(sklearn.base.BaseEstimator,
         @param window_batch_size Size of batches of windows to compute in a
                run of encode, to save RAM.
         """
-        features = numpy.empty((
-                numpy.shape(X)[0], self.out_channels,
-                numpy.shape(X)[2] - window + 1
-        ))
-        masking = numpy.empty((
-            min(window_batch_size, numpy.shape(X)[2] - window + 1),
-            numpy.shape(X)[1], window
-        ))
+        features = numpy.empty(
+            (numpy.shape(X)[0], self.out_channels, numpy.shape(X)[2] - window + 1)
+        )
+        masking = numpy.empty(
+            (
+                min(window_batch_size, numpy.shape(X)[2] - window + 1),
+                numpy.shape(X)[1],
+                window,
+            )
+        )
         for b in range(numpy.shape(X)[0]):
-            for i in range(math.ceil(
-                (numpy.shape(X)[2] - window + 1) / window_batch_size)
+            for i in range(
+                math.ceil((numpy.shape(X)[2] - window + 1) / window_batch_size)
             ):
                 for j in range(
                     i * window_batch_size,
-                    min(
-                        (i + 1) * window_batch_size,
-                        numpy.shape(X)[2] - window + 1
-                    )
+                    min((i + 1) * window_batch_size, numpy.shape(X)[2] - window + 1),
                 ):
                     j0 = j - i * window_batch_size
-                    masking[j0, :, :] = X[b, :, j: j + window]
+                    masking[j0, :, :] = X[b, :, j : j + window]
                 features[
-                    b, :, i * window_batch_size: (i + 1) * window_batch_size
+                    b, :, i * window_batch_size : (i + 1) * window_batch_size
                 ] = numpy.swapaxes(
-                    self.encode(masking[:j0 + 1], batch_size=batch_size), 0, 1
+                    self.encode(masking[: j0 + 1], batch_size=batch_size), 0, 1
                 )
         return features
 
@@ -468,46 +489,88 @@ class CausalCNNEncoderClassifier(TimeSeriesEncoderClassifier):
     @param cuda Transfers, if True, all computations to the GPU.
     @param gpu GPU index to use, if CUDA is enabled.
     """
-    def __init__(self, compared_length=50, nb_random_samples=10,
-                 negative_penalty=1, batch_size=1, nb_steps=2000, lr=0.001,
-                 penalty=1, early_stopping=None, channels=10, depth=1,
-                 reduced_size=10, out_channels=10, kernel_size=4,
-                 in_channels=1, cuda=False, gpu=0):
+
+    def __init__(
+        self,
+        compared_length=50,
+        nb_random_samples=10,
+        negative_penalty=1,
+        batch_size=1,
+        nb_steps=2000,
+        lr=0.001,
+        penalty=1,
+        early_stopping=None,
+        channels=10,
+        depth=1,
+        reduced_size=10,
+        out_channels=10,
+        kernel_size=4,
+        in_channels=1,
+        cuda=False,
+        gpu=0,
+    ):
         super(CausalCNNEncoderClassifier, self).__init__(
-            compared_length, nb_random_samples, negative_penalty, batch_size,
-            nb_steps, lr, penalty, early_stopping,
-            self.__create_encoder(in_channels, channels, depth, reduced_size,
-                                  out_channels, kernel_size, cuda, gpu),
-            self.__encoder_params(in_channels, channels, depth, reduced_size,
-                                  out_channels, kernel_size),
-            in_channels, out_channels, cuda, gpu
+            compared_length,
+            nb_random_samples,
+            negative_penalty,
+            batch_size,
+            nb_steps,
+            lr,
+            penalty,
+            early_stopping,
+            self.__create_encoder(
+                in_channels,
+                channels,
+                depth,
+                reduced_size,
+                out_channels,
+                kernel_size,
+                cuda,
+                gpu,
+            ),
+            self.__encoder_params(
+                in_channels, channels, depth, reduced_size, out_channels, kernel_size
+            ),
+            in_channels,
+            out_channels,
+            cuda,
+            gpu,
         )
-        self.architecture = 'CausalCNN'
+        self.architecture = "CausalCNN"
         self.channels = channels
         self.depth = depth
         self.reduced_size = reduced_size
         self.kernel_size = kernel_size
 
-    def __create_encoder(self, in_channels, channels, depth, reduced_size,
-                         out_channels, kernel_size, cuda, gpu):
+    def __create_encoder(
+        self,
+        in_channels,
+        channels,
+        depth,
+        reduced_size,
+        out_channels,
+        kernel_size,
+        cuda,
+        gpu,
+    ):
         encoder = networks.causal_cnn.CausalCNNEncoder(
-            in_channels, channels, depth, reduced_size, out_channels,
-            kernel_size
+            in_channels, channels, depth, reduced_size, out_channels, kernel_size
         )
         encoder.double()
         if cuda:
             encoder.cuda(gpu)
         return encoder
 
-    def __encoder_params(self, in_channels, channels, depth, reduced_size,
-                         out_channels, kernel_size):
+    def __encoder_params(
+        self, in_channels, channels, depth, reduced_size, out_channels, kernel_size
+    ):
         return {
-            'in_channels': in_channels,
-            'channels': channels,
-            'depth': depth,
-            'reduced_size': reduced_size,
-            'out_channels': out_channels,
-            'kernel_size': kernel_size
+            "in_channels": in_channels,
+            "channels": channels,
+            "depth": depth,
+            "reduced_size": reduced_size,
+            "out_channels": out_channels,
+            "kernel_size": kernel_size,
         }
 
     def encode_sequence(self, X, batch_size=50):
@@ -534,9 +597,7 @@ class CausalCNNEncoderClassifier(TimeSeriesEncoderClassifier):
             test, batch_size=batch_size if not varying else 1
         )
         length = numpy.shape(X)[2]
-        features = numpy.full(
-            (numpy.shape(X)[0], self.out_channels, length), numpy.nan
-        )
+        features = numpy.full((numpy.shape(X)[0], self.out_channels, length), numpy.nan)
         self.encoder = self.encoder.eval()
 
         causal_cnn = self.encoder.network[0]
@@ -560,25 +621,27 @@ class CausalCNNEncoderClassifier(TimeSeriesEncoderClassifier):
                     # pooling layer
                     for i in range(1, length):
                         after_pool[:, :, i] = torch.max(
-                            torch.cat([
-                                after_pool[:, :, i - 1: i],
-                                output_causal_cnn[:, :, i: i+1]
-                            ], dim=2),
-                            dim=2
+                            torch.cat(
+                                [
+                                    after_pool[:, :, i - 1 : i],
+                                    output_causal_cnn[:, :, i : i + 1],
+                                ],
+                                dim=2,
+                            ),
+                            dim=2,
                         )[0]
                     features[
-                        count * batch_size: (count + 1) * batch_size, :, :
-                    ] = torch.transpose(linear(
-                        torch.transpose(after_pool, 1, 2)
-                    ), 1, 2)
+                        count * batch_size : (count + 1) * batch_size, :, :
+                    ] = torch.transpose(linear(torch.transpose(after_pool, 1, 2)), 1, 2)
                     count += 1
             else:
                 for batch in test_generator:
                     if self.cuda:
                         batch = batch.cuda(self.gpu)
-                    length = batch.size(2) - torch.sum(
-                        torch.isnan(batch[0, 0])
-                    ).data.cpu().numpy()
+                    length = (
+                        batch.size(2)
+                        - torch.sum(torch.isnan(batch[0, 0])).data.cpu().numpy()
+                    )
                     output_causal_cnn = causal_cnn(batch)
                     after_pool = torch.empty(
                         output_causal_cnn.size(), dtype=torch.double
@@ -588,17 +651,18 @@ class CausalCNNEncoderClassifier(TimeSeriesEncoderClassifier):
                     after_pool[:, :, 0] = output_causal_cnn[:, :, 0]
                     for i in range(1, length):
                         after_pool[:, :, i] = torch.max(
-                            torch.cat([
-                                after_pool[:, :, i - 1: i],
-                                output_causal_cnn[:, :, i: i+1]
-                            ], dim=2),
-                            dim=2
+                            torch.cat(
+                                [
+                                    after_pool[:, :, i - 1 : i],
+                                    output_causal_cnn[:, :, i : i + 1],
+                                ],
+                                dim=2,
+                            ),
+                            dim=2,
                         )[0]
-                    features[
-                        count: count + 1, :, :
-                    ] = torch.transpose(linear(
-                        torch.transpose(after_pool, 1, 2)
-                    ), 1, 2)
+                    features[count : count + 1, :, :] = torch.transpose(
+                        linear(torch.transpose(after_pool, 1, 2)), 1, 2
+                    )
                     count += 1
 
         self.encoder = self.encoder.train()
@@ -606,32 +670,60 @@ class CausalCNNEncoderClassifier(TimeSeriesEncoderClassifier):
 
     def get_params(self, deep=True):
         return {
-            'compared_length': self.loss.compared_length,
-            'nb_random_samples': self.loss.nb_random_samples,
-            'negative_penalty': self.loss.negative_penalty,
-            'batch_size': self.batch_size,
-            'nb_steps': self.nb_steps,
-            'lr': self.lr,
-            'penalty': self.penalty,
-            'early_stopping': self.early_stopping,
-            'channels': self.channels,
-            'depth': self.depth,
-            'reduced_size': self.reduced_size,
-            'kernel_size': self.kernel_size,
-            'in_channels': self.in_channels,
-            'out_channels': self.out_channels,
-            'cuda': self.cuda,
-            'gpu': self.gpu
+            "compared_length": self.loss.compared_length,
+            "nb_random_samples": self.loss.nb_random_samples,
+            "negative_penalty": self.loss.negative_penalty,
+            "batch_size": self.batch_size,
+            "nb_steps": self.nb_steps,
+            "lr": self.lr,
+            "penalty": self.penalty,
+            "early_stopping": self.early_stopping,
+            "channels": self.channels,
+            "depth": self.depth,
+            "reduced_size": self.reduced_size,
+            "kernel_size": self.kernel_size,
+            "in_channels": self.in_channels,
+            "out_channels": self.out_channels,
+            "cuda": self.cuda,
+            "gpu": self.gpu,
         }
 
-    def set_params(self, compared_length, nb_random_samples, negative_penalty,
-                   batch_size, nb_steps, lr, penalty, early_stopping,
-                   channels, depth, reduced_size, out_channels, kernel_size,
-                   in_channels, cuda, gpu):
+    def set_params(
+        self,
+        compared_length,
+        nb_random_samples,
+        negative_penalty,
+        batch_size,
+        nb_steps,
+        lr,
+        penalty,
+        early_stopping,
+        channels,
+        depth,
+        reduced_size,
+        out_channels,
+        kernel_size,
+        in_channels,
+        cuda,
+        gpu,
+    ):
         self.__init__(
-            compared_length, nb_random_samples, negative_penalty, batch_size,
-            nb_steps, lr, penalty, early_stopping, channels, depth,
-            reduced_size, out_channels, kernel_size, in_channels, cuda, gpu
+            compared_length,
+            nb_random_samples,
+            negative_penalty,
+            batch_size,
+            nb_steps,
+            lr,
+            penalty,
+            early_stopping,
+            channels,
+            depth,
+            reduced_size,
+            out_channels,
+            kernel_size,
+            in_channels,
+            cuda,
+            gpu,
         )
         return self
 
@@ -665,17 +757,39 @@ class LSTMEncoderClassifier(TimeSeriesEncoderClassifier):
     @param in_channels Number of input channels of the time series.
     @param gpu GPU index to use, if CUDA is enabled.
     """
-    def __init__(self, compared_length=50, nb_random_samples=10,
-                 negative_penalty=1, batch_size=1, nb_steps=2000, lr=0.001,
-                 penalty=1, early_stopping=None, in_channels=1, cuda=False,
-                 gpu=0):
+
+    def __init__(
+        self,
+        compared_length=50,
+        nb_random_samples=10,
+        negative_penalty=1,
+        batch_size=1,
+        nb_steps=2000,
+        lr=0.001,
+        penalty=1,
+        early_stopping=None,
+        in_channels=1,
+        cuda=False,
+        gpu=0,
+    ):
         super(LSTMEncoderClassifier, self).__init__(
-            compared_length, nb_random_samples, negative_penalty, batch_size,
-            nb_steps, lr, penalty, early_stopping,
-            self.__create_encoder(cuda, gpu), {}, in_channels, 160, cuda, gpu
+            compared_length,
+            nb_random_samples,
+            negative_penalty,
+            batch_size,
+            nb_steps,
+            lr,
+            penalty,
+            early_stopping,
+            self.__create_encoder(cuda, gpu),
+            {},
+            in_channels,
+            160,
+            cuda,
+            gpu,
         )
         assert in_channels == 1
-        self.architecture = 'LSTM'
+        self.architecture = "LSTM"
 
     def __create_encoder(self, cuda, gpu):
         encoder = networks.lstm.LSTMEncoder()
@@ -686,24 +800,44 @@ class LSTMEncoderClassifier(TimeSeriesEncoderClassifier):
 
     def get_params(self, deep=True):
         return {
-            'compared_length': self.loss.compared_length,
-            'nb_random_samples': self.loss.nb_random_samples,
-            'negative_penalty': self.loss.negative_penalty,
-            'batch_size': self.batch_size,
-            'nb_steps': self.nb_steps,
-            'lr': self.lr,
-            'penalty': self.penalty,
-            'early_stopping': self.early_stopping,
-            'in_channels': self.in_channels,
-            'cuda': self.cuda,
-            'gpu': self.gpu
+            "compared_length": self.loss.compared_length,
+            "nb_random_samples": self.loss.nb_random_samples,
+            "negative_penalty": self.loss.negative_penalty,
+            "batch_size": self.batch_size,
+            "nb_steps": self.nb_steps,
+            "lr": self.lr,
+            "penalty": self.penalty,
+            "early_stopping": self.early_stopping,
+            "in_channels": self.in_channels,
+            "cuda": self.cuda,
+            "gpu": self.gpu,
         }
 
-    def set_params(self, compared_length, nb_random_samples, negative_penalty,
-                   batch_size, nb_steps, lr, penalty, early_stopping,
-                   in_channels, cuda, gpu):
+    def set_params(
+        self,
+        compared_length,
+        nb_random_samples,
+        negative_penalty,
+        batch_size,
+        nb_steps,
+        lr,
+        penalty,
+        early_stopping,
+        in_channels,
+        cuda,
+        gpu,
+    ):
         self.__init__(
-            compared_length, nb_random_samples, negative_penalty, batch_size,
-            nb_steps, lr, penalty, early_stopping, in_channels, cuda, gpu
+            compared_length,
+            nb_random_samples,
+            negative_penalty,
+            batch_size,
+            nb_steps,
+            lr,
+            penalty,
+            early_stopping,
+            in_channels,
+            cuda,
+            gpu,
         )
         return self
